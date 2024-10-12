@@ -50,8 +50,8 @@ const random = async function(req, res) {
   // Here is a complete example of how to query the database in JavaScript.
   // Only a small change (unrelated to querying) is required for TASK 3 in this route.
   connection.query(`
-    SELECT *
-    FROM Songs
+    SELECT song_id, title
+    FROM songs
     WHERE explicit <= ${explicit}
     ORDER BY RANDOM()
     LIMIT 1
@@ -86,7 +86,7 @@ const song = async function(req, res) {
   // Hint: unlike route 2, you can directly SELECT * and just return data.rows[0]
   // Most of the code is already written for you, you just need to fill in the query
   connection.query(`
-    SELECT *
+    SELECT song_id, album_id, title, number, duration, plays, danceability, energy, valence, tempo, key_mode, explicit
     FROM songs
     WHERE song_id = '${req.params.song_id}'
     `, (err, data) => {
@@ -103,7 +103,7 @@ const song = async function(req, res) {
 const album = async function(req, res) {
   // TODO (TASK 5): implement a route that given a album_id, returns all information about the album
   connection.query(`
-    SELECT *
+    SELECT album_id, title, release_date, thumbnail_url
     FROM albums
     WHERE album_id = '${req.params.albumn_id}'
     `, (err, data) => {
@@ -121,7 +121,7 @@ const albums = async function(req, res) {
   // TODO (TASK 6): implement a route that returns all albums ordered by release date (descending)
   // Note that in this case you will need to return multiple albums, so you will need to return an array of objects
   connection.query(`
-    SELECT title
+    SELECT album_id, title, release_date, thumbnail_url
     FROM albums
     ORDER BY release_date DESC
   `, (err, data) => {
@@ -138,7 +138,7 @@ const albums = async function(req, res) {
 const album_songs = async function(req, res) {
   // TODO (TASK 7): implement a route that given an album_id, returns all songs on that album ordered by track number (ascending)
   connection.query(`
-    SELECT title
+    SELECT song_id, title, number, duration, plays
     FROM songs
     WHERE album_id = '${req.params.album_id}'
     ORDER BY number ASC
@@ -165,11 +165,37 @@ const top_songs = async function(req, res) {
   if (!page) {
     // TODO (TASK 9)): query the database and return all songs ordered by number of plays (descending)
     // Hint: you will need to use a JOIN to get the album title as well
-    res.json([]); // replace this with your implementation
+    connection.query(`
+      SELECT s.song_id, s.title, s.album_id, a.title AS album, s.plays
+      FROM Songs s
+      JOIN Albums a ON s.album_id = a.album_id
+      ORDER BY s.plays DESC
+    `, (err, data) => {
+      if (err) {
+        console.log(err);
+        res.json([]);
+      } else {
+        res.json(data.rows);
+      }
+    });
   } else {
     // TODO (TASK 10): reimplement TASK 9 with pagination
     // Hint: use LIMIT and OFFSET (see https://www.w3schools.com/php/php_mysql_select_limit.asp)
-    res.json([]); // replace this with your implementation
+    const offset = (page - 1) * pageSize;
+    connection.query(`
+      SELECT s.song_id, s.title, s.album_id, a.title AS album, s.plays
+      FROM Songs s
+      JOIN Albums a ON s.album_id = a.album_id
+      ORDER BY s.plays DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `, (err, data) => {
+      if (err) {
+        console.log(err);
+        res.json([]);
+      } else {
+        res.json(data.rows);
+      }
+    });
   }
 }
 

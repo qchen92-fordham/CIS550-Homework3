@@ -35,8 +35,9 @@ const author = async function(req, res) {
     res.json({ name: name });
   } else if (req.params.type === 'pennkey') {
     // TODO (TASK 2): edit the else if condition to check if the request parameter is 'pennkey' and if so, send back a JSON response with the pennkey
+    res.json({ pennkey: pennkey });
   } else {
-    res.status(400).json({});
+    res.status(404).json({});
   }
 }
 
@@ -105,7 +106,7 @@ const album = async function(req, res) {
   connection.query(`
     SELECT album_id, title, release_date, thumbnail_url
     FROM albums
-    WHERE album_id = '${req.params.albumn_id}'
+    WHERE album_id = '${req.params.album_id}'
     `, (err, data) => {
     if (err) {
       console.log(err);
@@ -121,13 +122,13 @@ const albums = async function(req, res) {
   // TODO (TASK 6): implement a route that returns all albums ordered by release date (descending)
   // Note that in this case you will need to return multiple albums, so you will need to return an array of objects
   connection.query(`
-    SELECT album_id, title, release_date, thumbnail_url
+    SELECT *
     FROM albums
     ORDER BY release_date DESC
   `, (err, data) => {
     if (err) {
       console.log(err);
-      res.json([]);
+      res.json({});
     } else {
       res.json(data.rows);
     }
@@ -157,43 +158,59 @@ const album_songs = async function(req, res) {
  ************************/
 
 // Route 7: GET /top_songs
-const top_songs = async function(req, res) {
+const top_songs = async function (req, res) {
   const page = req.query.page;
+
   // TODO (TASK 8): use the ternary (or nullish) operator to set the pageSize based on the query or default to 10
-  const pageSize = req.query.page_size ?? 10;
+  const pageSize = !!req.query.page_size ? req.query.page_size : 10;
 
   if (!page) {
     // TODO (TASK 9)): query the database and return all songs ordered by number of plays (descending)
     // Hint: you will need to use a JOIN to get the album title as well
     connection.query(`
-      SELECT s.song_id, s.title, s.album_id, a.title AS album, s.plays
-      FROM Songs s
-      JOIN Albums a ON s.album_id = a.album_id
+      SELECT s.song_id, s.title AS title, s.album_id AS album_id, a.title AS album, s.plays AS plays
+      FROM songs s
+      JOIN albums a ON s.album_id = a.album_id
       ORDER BY s.plays DESC
-    `, (err, data) => {
+      `, (err, data) => {
       if (err) {
         console.log(err);
-        res.json([]);
+        res.json({});
       } else {
-        res.json(data.rows);
+        res.json(data.rows.map(row => ({
+          song_id: row.song_id,
+          title: row.title,
+          album_id: row.album_id,
+          album: row.album,
+          plays: row.plays
+        })));
       }
     });
+    // replace this with your implementation
   } else {
     // TODO (TASK 10): reimplement TASK 9 with pagination
     // Hint: use LIMIT and OFFSET (see https://www.w3schools.com/php/php_mysql_select_limit.asp)
-    const offset = (page - 1) * pageSize;
+    // replace this with your implementation
+    const offset = pageSize * (page - 1);
     connection.query(`
-      SELECT s.song_id, s.title, s.album_id, a.title AS album, s.plays
-      FROM Songs s
-      JOIN Albums a ON s.album_id = a.album_id
-      ORDER BY s.plays DESC
-      LIMIT ${pageSize} OFFSET ${offset}
+    SELECT song_id, songs.title as title, songs.album_id as album_id, albums.title as album, songs.plays as plays
+    FROM songs, albums
+    WHERE songs.album_id = albums.album_id
+    ORDER BY songs.plays DESC
+    LIMIT ${pageSize}
+    OFFSET ${offset}
     `, (err, data) => {
       if (err) {
         console.log(err);
-        res.json([]);
+        res.json({});
       } else {
-        res.json(data.rows);
+        res.json(data.rows.map(row => ({
+          song_id: row.song_id,
+          title: row.title,
+          album_id: row.album_id,
+          album: row.album,
+          plays: row.plays
+        })));
       }
     });
   }
@@ -205,29 +222,51 @@ const top_albums = async function(req, res) {
   // Hint: you will need to use a JOIN and aggregation to get the total plays of songs in an album
   const pageSize = req.query.page_size ?? 10;
   const page = req.query.page;
+  const offset = (page - 1) * pageSize;
 
-  const offset = page ? (page - 1) * pageSize : 0;
-  const limitClause = page ? `LIMIT ${pageSize} OFFSET ${offset}` : '';
-
-  connection.query(`
-    SELECT a.title, SUM(s.plays) AS plays
-    FROM albums a
-    JOIN songs s ON a.album_id = s.album_id
-    GROUP BY a.title
-    ORDER BY plays DESC
-    ${limitClause}
-  `, (err, data) => {
-    if (err) {
-      console.log(err);
-      res.json([]);
-    } else {
-      res.json(data.rows);
-    }
-  });
+  if (!page) {
+    connection.query(
+      `
+      SELECT a.album_id, a.title, SUM(s.plays) AS plays
+      FROM albums a
+      JOIN songs s ON a.album_id = s.album_id
+      GROUP BY a.album_id, a.title
+      ORDER BY plays DESC
+    `,
+      (err, data) => {
+        if (err) {
+          console.log(err);
+          res.json([]);
+        } else {
+          res.json(data.rows);
+        }
+      }
+    );
+  } else {
+    const offset = (page - 1) * pageSize;
+    connection.query(
+      `
+      SELECT a.album_id, a.title, SUM(s.plays) AS plays
+      FROM albums a
+      JOIN songs s ON a.album_id = s.album_id
+      GROUP BY a.album_id, a.title
+      ORDER BY plays DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `,
+      (err, data) => {
+        if (err) {
+          console.log(err);
+          res.json([]);
+        } else {
+          res.json(data.rows);
+        }
+      }
+    );
+  }
 }
 
 // Route 9: GET /search_albums
-const search_songs = async function(req, res) {
+const search_songs = async function (req, res) {
   // TODO (TASK 12): return all songs that match the given search query with parameters defaulted to those specified in API spec ordered by title (ascending)
   // Some default parameters have been provided for you, but you will need to fill in the rest
   const title = req.query.title ?? '';
@@ -243,8 +282,29 @@ const search_songs = async function(req, res) {
   const valenceHigh = req.query.valence_high ?? 1;
   const explicit = req.query.explicit === 'true' ? 1 : 0;
 
-  res.json([]); // replace this with your implementation
-}
+  connection.query(
+    `
+    SELECT *
+    FROM Songs
+    WHERE title LIKE '%${title}%'
+    AND duration BETWEEN ${durationLow} AND ${durationHigh}
+    AND plays BETWEEN ${playsLow} AND ${playsHigh}
+    AND danceability BETWEEN ${danceabilityLow} AND ${danceabilityHigh}
+    AND energy BETWEEN ${energyLow} AND ${energyHigh}
+    AND valence BETWEEN ${valenceLow} AND ${valenceHigh}
+    AND explicit <= ${explicit}
+    ORDER BY title ASC
+  `,
+    (err, data) => {
+      if (err) {
+        console.log(err);
+        res.json([]);
+      } else {
+        res.json(data.rows);
+      }
+    }
+  );
+};
 
 module.exports = {
   author,

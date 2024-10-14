@@ -62,11 +62,11 @@ export default function AlbumInfoPage() {
                 <TableCell key='#'>{songData[0].number}</TableCell>
                 <TableCell key='Title'>
                   <Link onClick={() => setSelectedSongId(songData[0].song_id)}>
-                    Replace me
+                    {songData[0].title}
                   </Link>
                 </TableCell>
-                <TableCell key='Plays'>Replace me</TableCell>
-                <TableCell key='Duration'>Replace me (use the formatDuration helper function, see SongCard.js for an example)</TableCell>
+                <TableCell key='Plays'>{songData[0].plays}</TableCell>
+                <TableCell key='Duration'>{formatDuration(songData[0].duration)}</TableCell>
               </TableRow>
             }
           </TableBody>
